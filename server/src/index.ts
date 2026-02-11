@@ -3,7 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
+import path from 'path';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { EventEmitter } from 'events';
@@ -28,19 +28,19 @@ import configsRouter from './routes/configs';
 // 导入中间件
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
-// 加载环境变量
-dotenv.config();
+// 导入配置
+import { env } from './config/env';
 
 const app: Application = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: env.CLIENT_URL,
     methods: ['GET', 'POST']
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = env.PORT;
 
 // 初始化服务
 const workflowService = new WorkflowService();
@@ -76,12 +76,34 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// 缓存控制中间件
+app.use((req, res, next) => {
+  // 静态资源设置长期缓存
+  if (req.path.startsWith('/uploads/')) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // 1年
+  }
+  // API响应设置短期缓存
+  else if (req.path.startsWith('/api/')) {
+    // GET请求可以缓存
+    if (req.method === 'GET') {
+      res.setHeader('Cache-Control', 'public, max-age=60'); // 1分钟
+    } else {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+  next();
+});
+
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));
 
 // 健康检查
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'AI工作流系统后端服务运行中' });
+});
+
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', environment: env.NODE_ENV, timestamp: new Date().toISOString() });
 });
 
 // API路由
@@ -152,6 +174,24 @@ eventEmitter.on('execution:cancelled', (data) => {
   io.to(data.executionId).emit('execution:cancelled', data);
 });
 
+// 生产环境静态文件服务
+if (env.NODE_ENV === 'production') {
+  // 指向前端构建目录
+  // 在Docker环境中，我们通常会将前端构建产物复制到服务器的public目录或特定目录
+  // 这里假设是在 monorepo 结构中运行，或者 Dockerfile 会保持这种结构
+  const clientBuildPath = path.join(__dirname, '../../client/dist');
+  
+  app.use(express.static(clientBuildPath));
+  
+  // 所有非API请求返回前端index.html
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
+
 // 404处理
 app.use(notFoundHandler);
 
@@ -160,8 +200,8 @@ app.use(errorHandler);
 
 // 启动服务器
 initServices().then(() => {
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
+  httpServer.listen(Number(PORT), env.HOST, () => {
+    console.log(`🚀 服务器运行在 http://${env.HOST}:${PORT}`);
     console.log(`📡 WebSocket服务已启动`);
     console.log(`📁 数据目录已初始化`);
   });
