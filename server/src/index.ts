@@ -12,6 +12,7 @@ import { EventEmitter } from 'events';
 import { WorkflowService } from './services/workflowService';
 import { ExecutionService } from './services/executionService';
 import { FileService } from './services/fileService';
+import { configService } from './services/configService';
 
 // 导入引擎
 import { createProcessorRegistry } from './engine/registry';
@@ -55,6 +56,7 @@ const workflowEngine = new WorkflowEngine(processorRegistry, eventEmitter);
 app.locals.workflowService = workflowService;
 app.locals.executionService = executionService;
 app.locals.fileService = fileService;
+app.locals.configService = configService;
 app.locals.workflowEngine = workflowEngine;
 
 // 初始化数据目录
@@ -62,6 +64,7 @@ async function initServices() {
   await workflowService.init();
   await executionService.init();
   await fileService.init();
+  await configService.init();
   console.log('✅ 服务初始化完成');
 }
 

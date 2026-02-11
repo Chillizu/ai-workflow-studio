@@ -9,17 +9,26 @@ import type { APIConfig } from '../../../shared/types';
 // 创建API配置的请求数据
 export interface CreateAPIConfigData {
   name: string;
-  type: 'openai' | 'stable-diffusion' | 'custom';
+  type: 'openai' | 'openrouter' | 'openai-compatible' | 'custom';
+  baseURL?: string;
   apiKey?: string;
-  endpoint?: string;
+  defaultModel?: string;
+  timeout?: number;
+  maxRetries?: number;
+  rateLimitPerMinute?: number;
   config?: Record<string, any>;
 }
 
 // 更新API配置的请求数据
 export interface UpdateAPIConfigData {
   name?: string;
+  type?: 'openai' | 'openrouter' | 'openai-compatible' | 'custom';
+  baseURL?: string;
   apiKey?: string;
-  endpoint?: string;
+  defaultModel?: string;
+  timeout?: number;
+  maxRetries?: number;
+  rateLimitPerMinute?: number;
   config?: Record<string, any>;
 }
 
@@ -27,7 +36,7 @@ export interface UpdateAPIConfigData {
  * 获取API配置列表
  */
 export const getAPIConfigs = async (): Promise<APIConfig[]> => {
-  const response = await apiClient.get<APIConfig[]>('/api/configs');
+  const response = await apiClient.get<APIConfig[]>('/api/configs/apis');
   return response.data;
 };
 
@@ -35,7 +44,7 @@ export const getAPIConfigs = async (): Promise<APIConfig[]> => {
  * 获取API配置详情
  */
 export const getAPIConfig = async (id: string): Promise<APIConfig> => {
-  const response = await apiClient.get<APIConfig>(`/api/configs/${id}`);
+  const response = await apiClient.get<APIConfig>(`/api/configs/apis/${id}`);
   return response.data;
 };
 
@@ -43,7 +52,7 @@ export const getAPIConfig = async (id: string): Promise<APIConfig> => {
  * 创建API配置
  */
 export const createAPIConfig = async (data: CreateAPIConfigData): Promise<APIConfig> => {
-  const response = await apiClient.post<APIConfig>('/api/configs', data);
+  const response = await apiClient.post<APIConfig>('/api/configs/apis', data);
   return response.data;
 };
 
@@ -51,7 +60,7 @@ export const createAPIConfig = async (data: CreateAPIConfigData): Promise<APICon
  * 更新API配置
  */
 export const updateAPIConfig = async (id: string, data: UpdateAPIConfigData): Promise<APIConfig> => {
-  const response = await apiClient.put<APIConfig>(`/api/configs/${id}`, data);
+  const response = await apiClient.put<APIConfig>(`/api/configs/apis/${id}`, data);
   return response.data;
 };
 
@@ -59,5 +68,23 @@ export const updateAPIConfig = async (id: string, data: UpdateAPIConfigData): Pr
  * 删除API配置
  */
 export const deleteAPIConfig = async (id: string): Promise<void> => {
-  await apiClient.delete(`/api/configs/${id}`);
+  await apiClient.delete(`/api/configs/apis/${id}`);
+};
+
+/**
+ * 测试API连接
+ */
+export const testAPIConnection = async (id: string): Promise<{ success: boolean; message: string }> => {
+  const response = await apiClient.post<{ success: boolean; message: string }>(
+    `/api/configs/apis/${id}/test`
+  );
+  return response.data;
+};
+
+/**
+ * 获取可用模型列表
+ */
+export const getAvailableModels = async (id: string): Promise<string[]> => {
+  const response = await apiClient.get<{ models: string[] }>(`/api/configs/apis/${id}/models`);
+  return response.data.models;
 };

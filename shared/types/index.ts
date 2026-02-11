@@ -75,8 +75,16 @@ export interface ExecutionRecord {
 export interface APIConfig {
   id: string;
   name: string;
-  type: 'openai' | 'stable-diffusion' | 'custom';
+  type: 'openai' | 'openrouter' | 'openai-compatible' | 'custom';
+  baseURL: string;
   apiKey?: string;
-  endpoint?: string;
-  config: Record<string, any>;
+  hasApiKey?: boolean;
+  models?: string[];
+  defaultModel?: string;
+  timeout?: number;
+  maxRetries?: number;
+  rateLimitPerMinute?: number;
+  config?: Record<string, any>;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
