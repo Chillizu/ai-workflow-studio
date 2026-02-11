@@ -4,8 +4,8 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Card, Form, Input, Button, Select, Space, Table, Modal, Popconfirm, message, Spin, Tag } from 'antd';
-import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Card, Form, Input, Button, Select, Space, Table, Modal, Popconfirm, message, Spin, Tag, Tooltip } from 'antd';
+import { Plus, Edit, Trash2, CheckCircle, XCircle, Key, Server, Zap, Globe } from 'lucide-react';
 import { MainLayout } from '../components/layout';
 import * as configApi from '../services/configApi';
 import type { APIConfig } from '../../../shared/types';
@@ -130,6 +130,14 @@ export const APISettingsPage = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
+      render: (text: string, record: APIConfig) => (
+         <div className="flex items-center gap-2">
+            <div className={`p-1.5 rounded-md ${record.type === 'openai' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'}`}>
+               <Globe size={16} />
+            </div>
+            <span className="font-medium text-white">{text}</span>
+         </div>
+      )
     },
     {
       title: '类型',
@@ -139,11 +147,11 @@ export const APISettingsPage = () => {
         const typeMap: Record<string, { label: string; color: string }> = {
           openai: { label: 'OpenAI', color: 'green' },
           openrouter: { label: 'OpenRouter', color: 'blue' },
-          'openai-compatible': { label: 'OpenAI兼容', color: 'purple' },
-          custom: { label: '自定义', color: 'orange' },
+          'openai-compatible': { label: 'OpenAI Compatible', color: 'purple' },
+          custom: { label: 'Custom', color: 'orange' },
         };
         const config = typeMap[type] || { label: type, color: 'default' };
-        return <Tag color={config.color}>{config.label}</Tag>;
+        return <Tag color={config.color} className="border-none">{config.label}</Tag>;
       },
     },
     {
@@ -152,13 +160,13 @@ export const APISettingsPage = () => {
       key: 'hasApiKey',
       render: (hasApiKey: boolean) =>
         hasApiKey ? (
-          <Tag color="green" icon={<CheckCircle size={14} />}>
-            已配置
-          </Tag>
+          <Tooltip title="已配置">
+             <Key size={16} className="text-emerald-500" />
+          </Tooltip>
         ) : (
-          <Tag color="red" icon={<XCircle size={14} />}>
-            未配置
-          </Tag>
+          <Tooltip title="未配置">
+             <Key size={16} className="text-gray-600" />
+          </Tooltip>
         ),
     },
     {
@@ -166,12 +174,13 @@ export const APISettingsPage = () => {
       dataIndex: 'baseURL',
       key: 'baseURL',
       ellipsis: true,
+      render: (url: string) => <span className="text-gray-400 font-mono text-xs">{url}</span>
     },
     {
       title: '默认模型',
       dataIndex: 'defaultModel',
       key: 'defaultModel',
-      render: (model: string) => model || '-',
+      render: (model: string) => model ? <Tag className="bg-dark-bg border-dark-border text-gray-300">{model}</Tag> : '-',
     },
     {
       title: '操作',
@@ -180,10 +189,12 @@ export const APISettingsPage = () => {
         <Space>
           <Button
             size="small"
+            icon={<Zap size={14} />}
             onClick={() => handleTestConnection(record.id)}
             loading={testingId === record.id}
+            className="text-yellow-500 border-yellow-500/20 hover:text-yellow-400 hover:border-yellow-400 hover:bg-yellow-500/10"
           >
-            测试连接
+            测试
           </Button>
           <Button
             size="small"
@@ -199,7 +210,6 @@ export const APISettingsPage = () => {
             cancelText="取消"
           >
             <Button size="small" danger icon={<Trash2 size={14} />}>
-              删除
             </Button>
           </Popconfirm>
         </Space>
@@ -209,9 +219,12 @@ export const APISettingsPage = () => {
 
   return (
     <MainLayout>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-white">API配置</h1>
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+             <h1 className="text-2xl font-bold text-white mb-1">API 服务配置</h1>
+             <p className="text-gray-400">管理 LLM 服务提供商的连接设置</p>
+          </div>
           <Button
             type="primary"
             icon={<Plus size={16} />}
@@ -222,20 +235,20 @@ export const APISettingsPage = () => {
           </Button>
         </div>
 
-        <Card className="bg-dark-surface border-dark-border">
-          <Spin spinning={loading}>
-            <Table
-              columns={columns}
-              dataSource={configs}
-              rowKey="id"
-              pagination={false}
-            />
-          </Spin>
+        <Card className="bg-dark-surface border-dark-border shadow-md">
+          <Table
+            columns={columns}
+            dataSource={configs}
+            rowKey="id"
+            pagination={false}
+            loading={loading}
+            className="ant-table-custom"
+          />
         </Card>
 
         {/* 创建/编辑对话框 */}
         <Modal
-          title={editingConfig ? '编辑API配置' : '添加API配置'}
+          title={editingConfig ? '编辑 API 配置' : '添加 API 配置'}
           open={modalVisible}
           onCancel={() => {
             setModalVisible(false);
@@ -246,40 +259,44 @@ export const APISettingsPage = () => {
           okText="保存"
           cancelText="取消"
           width={600}
+          centered
         >
-          <Form form={form} layout="vertical" onFinish={handleSave}>
-            <Form.Item
-              label="API类型"
-              name="type"
-              rules={[{ required: true, message: '请选择API类型' }]}
-              initialValue="openai"
-            >
-              <Select placeholder="选择API类型" onChange={handleTypeChange}>
-                <Select.Option value="openai">OpenAI</Select.Option>
-                <Select.Option value="openrouter">OpenRouter</Select.Option>
-                <Select.Option value="openai-compatible">OpenAI兼容</Select.Option>
-                <Select.Option value="custom">自定义</Select.Option>
-              </Select>
-            </Form.Item>
+          <Form form={form} layout="vertical" onFinish={handleSave} className="pt-4">
+            <div className="grid grid-cols-2 gap-4">
+               <Form.Item
+                 label="API 类型"
+                 name="type"
+                 rules={[{ required: true, message: '请选择API类型' }]}
+                 initialValue="openai"
+               >
+                 <Select placeholder="选择API类型" onChange={handleTypeChange}>
+                   <Select.Option value="openai">OpenAI</Select.Option>
+                   <Select.Option value="openrouter">OpenRouter</Select.Option>
+                   <Select.Option value="openai-compatible">OpenAI Compatible</Select.Option>
+                   <Select.Option value="custom">Custom</Select.Option>
+                 </Select>
+               </Form.Item>
+
+               <Form.Item
+                 label="配置名称"
+                 name="name"
+                 rules={[{ required: true, message: '请输入配置名称' }]}
+               >
+                 <Input placeholder="例如: Production OpenAI" />
+               </Form.Item>
+            </div>
 
             <Form.Item
-              label="配置名称"
-              name="name"
-              rules={[{ required: true, message: '请输入配置名称' }]}
-            >
-              <Input placeholder="例如: 我的OpenAI配置" />
-            </Form.Item>
-
-            <Form.Item
-              label="API端点 (baseURL)"
+              label="API 端点 (Base URL)"
               name="baseURL"
               rules={[{ required: true, message: '请输入API端点' }]}
+              help={<span className="text-xs text-gray-500">API 服务的根地址</span>}
             >
-              <Input placeholder="https://api.openai.com/v1" />
+              <Input prefix={<Server size={14} className="text-gray-400"/>} placeholder="https://api.openai.com/v1" />
             </Form.Item>
 
             <Form.Item
-              label="API密钥"
+              label="API 密钥"
               name="apiKey"
               rules={[
                 {
@@ -287,27 +304,31 @@ export const APISettingsPage = () => {
                   message: '请输入API密钥',
                 },
               ]}
+              help={<span className="text-xs text-gray-500">密钥将安全加密存储</span>}
             >
               <Input.Password
-                placeholder={editingConfig ? '留空表示不修改' : '输入API密钥'}
+                prefix={<Key size={14} className="text-gray-400"/>}
+                placeholder={editingConfig ? '留空保持不变' : 'sk-...'}
               />
             </Form.Item>
 
             <Form.Item label="默认模型" name="defaultModel">
-              <Input placeholder="例如: dall-e-3" />
+              <Input placeholder="例如: gpt-4-turbo" />
             </Form.Item>
 
-            <Form.Item label="超时时间 (毫秒)" name="timeout">
-              <Input type="number" placeholder="60000" />
-            </Form.Item>
+            <div className="grid grid-cols-3 gap-4">
+               <Form.Item label="超时 (ms)" name="timeout">
+                 <Input type="number" placeholder="60000" />
+               </Form.Item>
 
-            <Form.Item label="最大重试次数" name="maxRetries">
-              <Input type="number" placeholder="3" />
-            </Form.Item>
+               <Form.Item label="重试次数" name="maxRetries">
+                 <Input type="number" placeholder="3" />
+               </Form.Item>
 
-            <Form.Item label="每分钟请求限制" name="rateLimitPerMinute">
-              <Input type="number" placeholder="60" />
-            </Form.Item>
+               <Form.Item label="速率限制 (/min)" name="rateLimitPerMinute">
+                 <Input type="number" placeholder="60" />
+               </Form.Item>
+            </div>
           </Form>
         </Modal>
       </div>

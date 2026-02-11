@@ -1,32 +1,47 @@
-import { Handle, Position } from '@xyflow/react';
-import { ImageIcon } from 'lucide-react';
+import { Handle, Position, NodeProps } from '@xyflow/react';
+import { Image as ImageIcon, Download } from 'lucide-react';
+import { memo } from 'react';
+import { Button } from 'antd';
 
-interface ImageOutputNodeProps {
-  data: {
-    label: string;
-    imageUrl?: string;
-  };
+interface ImageOutputNodeData {
+  label: string;
+  imageUrl?: string;
+  [key: string]: unknown;
 }
 
-export const ImageOutputNode: React.FC<ImageOutputNodeProps> = ({ data }) => {
+export const ImageOutputNode = memo(({ data, selected }: NodeProps<any>) => {
+  const nodeData = data as ImageOutputNodeData;
   return (
-    <div className="px-4 py-3 bg-dark-surface border-2 border-orange-500 rounded-lg shadow-lg min-w-[200px]">
+    <div className={`px-4 py-3 bg-dark-surface border-2 rounded-lg shadow-lg min-w-[200px] transition-colors ${selected ? 'border-primary shadow-glow-sm' : 'border-amber-500/50 hover:border-amber-500'}`}>
       <Handle
         type="target"
         position={Position.Left}
-        className="w-3 h-3 bg-orange-500"
+        className="!w-3 !h-3 !bg-amber-500 !border-2 !border-dark-surface hover:!w-4 hover:!h-4 transition-all"
       />
-      
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1.5 bg-orange-500/20 rounded">
-          <ImageIcon size={16} className="text-orange-500" />
+
+      <div className="flex items-center gap-3 mb-2">
+        <div className="p-2 bg-amber-500/10 rounded-md">
+          <ImageIcon size={18} className="text-amber-500" />
         </div>
-        <div className="font-semibold text-white">{data.label}</div>
+        <div className="font-semibold text-white">{nodeData.label}</div>
       </div>
       
-      <div className="text-sm text-gray-400">
-        {data.imageUrl ? '已生成图片' : '图片输出节点'}
+      <div className="bg-dark-bg/50 rounded-md border border-dark-border/50 overflow-hidden flex items-center justify-center h-[150px] w-full relative group">
+         {nodeData.imageUrl ? (
+            <>
+                <img src={nodeData.imageUrl} alt="Result" className="w-full h-full object-contain" />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <a href={nodeData.imageUrl} download target="_blank" rel="noreferrer">
+                        <Button type="primary" shape="circle" icon={<Download size={16} />} />
+                    </a>
+                </div>
+            </>
+         ) : (
+            <div className="text-gray-500 text-xs text-center p-4">
+               等待生成结果...
+            </div>
+         )}
       </div>
     </div>
   );
-};
+});

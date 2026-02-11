@@ -1,14 +1,17 @@
-import { Form, Input, Select, Card, InputNumber } from 'antd';
+import { Form, Input, Select, Card, InputNumber, Divider, Switch } from 'antd';
 import type { Node } from '@xyflow/react';
 import { useEffect, useState } from 'react';
 import * as configApi from '../../services/configApi';
 import type { APIConfig } from '../../../../shared/types';
+import { Settings, Info, Hash, Type } from 'lucide-react';
 
 interface PropertiesPanelProps {
   node: Node;
+  onUpdate?: (node: Node) => void;
 }
 
-export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
+export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node, onUpdate }) => {
+  const [form] = Form.useForm();
   const [apiConfigs, setApiConfigs] = useState<APIConfig[]>([]);
   const [selectedConfigId, setSelectedConfigId] = useState<string | undefined>(
     node.data?.config?.apiConfigId
@@ -16,7 +19,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
 
-  // 加载API配置列表
+  // Load API configs
   useEffect(() => {
     const loadConfigs = async () => {
       try {
@@ -29,7 +32,16 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
     loadConfigs();
   }, []);
 
-  // 当选择配置时，加载可用模型
+  // Update form when node changes
+  useEffect(() => {
+    form.setFieldsValue({
+      label: node.data?.label,
+      ...node.data?.config, // Flatten config for form
+    });
+    setSelectedConfigId(node.data?.config?.apiConfigId);
+  }, [node, form]);
+
+  // Load models when config changes
   useEffect(() => {
     const loadModels = async () => {
       if (!selectedConfigId) {
@@ -51,129 +63,118 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ node }) => {
     loadModels();
   }, [selectedConfigId]);
 
+  const handleValuesChange = (_: any, allValues: any) => {
+    if (!onUpdate) return;
+
+    const { label, ...configValues } = allValues;
+    
+    // Construct the updated node
+    const updatedNode = {
+      ...node,
+      data: {
+        ...node.data,
+        label: label,
+        config: {
+            ...node.data.config,
+            ...configValues,
+            apiConfigId: selectedConfigId || configValues.apiConfigId, // Ensure config ID is captured if it was set separately
+        },
+      },
+    };
+    
+    onUpdate(updatedNode);
+  };
+
   return (
-    <div className="p-4 h-full overflow-y-auto">
-      <h3 className="text-lg font-semibold text-white mb-4">节点属性</h3>
-      
-      <Card className="bg-dark-hover border-dark-border mb-4">
-        <div className="space-y-2">
-          <div>
-            <span className="text-gray-400 text-sm">节点ID:</span>
-            <p className="text-white font-mono text-sm">{node.id}</p>
+    <div className="h-full overflow-y-auto custom-scrollbar">
+      <div className="p-4 space-y-6">
+        {/* Basic Info */}
+        <div className="bg-dark-bg p-4 rounded-lg border border-dark-border">
+          <div className="flex items-center gap-2 mb-3 text-gray-400 text-sm font-medium">
+             <Info size={14} /> 基础信息
           </div>
-          <div>
-            <span className="text-gray-400 text-sm">节点类型:</span>
-            <p className="text-white">{node.type || 'default'}</p>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-500">ID</span>
+              <span className="text-gray-300 font-mono truncate max-w-[120px]" title={node.id}>{node.id}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">类型</span>
+              <span className="text-primary bg-primary/10 px-2 py-0.5 rounded text-xs">{node.type}</span>
+            </div>
           </div>
         </div>
-      </Card>
 
-      <Form layout="vertical">
-        <Form.Item label={<span className="text-white">标签</span>}>
-          <Input
-            defaultValue={node.data?.label as string}
-            placeholder="输入节点标签"
-          />
-        </Form.Item>
-
-        {node.type === 'textInput' && (
-          <Form.Item label={<span className="text-white">默认文本</span>}>
-            <Input.TextArea
-              rows={4}
-              placeholder="输入默认文本"
-            />
-          </Form.Item>
-        )}
-
-        {node.type === 'aiImage' && (
-          <>
-            <Form.Item label={<span className="text-white">API配置</span>}>
-              <Select
-                placeholder="选择API配置"
-                value={selectedConfigId}
-                onChange={setSelectedConfigId}
-              >
-                {apiConfigs.map(config => (
-                  <Select.Option key={config.id} value={config.id}>
-                    {config.name} ({config.type})
-                  </Select.Option>
-                ))}
-              </Select>
+        <Form
+            form={form}
+            layout="vertical"
+            onValuesChange={handleValuesChange}
+            initialValues={{
+                label: node.data?.label,
+                ...node.data?.config
+            }}
+        >
+            <Form.Item label="节点名称" name="label">
+                <Input prefix={<Type size={16} className="text-gray-500" />} placeholder="输入节点名称" />
             </Form.Item>
 
-            {selectedConfigId && (
-              <>
-                <Form.Item label={<span className="text-white">模型</span>}>
-                  <Select
-                    placeholder="选择模型"
-                    loading={loadingModels}
-                    defaultValue={node.data?.config?.model}
-                  >
-                    {availableModels.map(model => (
-                      <Select.Option key={model} value={model}>
-                        {model}
-                      </Select.Option>
-                    ))}
-                  </Select>
+            {/* Dynamic Fields based on Node Type */}
+            {node.type === 'textInput' && (
+                <Form.Item label="默认文本" name="defaultText">
+                    <Input.TextArea rows={4} placeholder="输入默认文本内容..." />
                 </Form.Item>
-
-                <Form.Item label={<span className="text-white">图片宽度</span>}>
-                  <InputNumber
-                    min={256}
-                    max={2048}
-                    step={64}
-                    defaultValue={node.data?.config?.width || 1024}
-                    placeholder="1024"
-                    className="w-full"
-                  />
-                </Form.Item>
-
-                <Form.Item label={<span className="text-white">图片高度</span>}>
-                  <InputNumber
-                    min={256}
-                    max={2048}
-                    step={64}
-                    defaultValue={node.data?.config?.height || 1024}
-                    placeholder="1024"
-                    className="w-full"
-                  />
-                </Form.Item>
-
-                <Form.Item label={<span className="text-white">采样步数</span>}>
-                  <InputNumber
-                    min={1}
-                    max={150}
-                    defaultValue={node.data?.config?.steps || 30}
-                    placeholder="30"
-                    className="w-full"
-                  />
-                </Form.Item>
-
-                <Form.Item label={<span className="text-white">CFG Scale</span>}>
-                  <InputNumber
-                    min={1}
-                    max={20}
-                    step={0.5}
-                    defaultValue={node.data?.config?.cfgScale || 7}
-                    placeholder="7"
-                    className="w-full"
-                  />
-                </Form.Item>
-
-                <Form.Item label={<span className="text-white">随机种子</span>}>
-                  <InputNumber
-                    min={-1}
-                    max={2147483647}
-                    defaultValue={node.data?.config?.seed || -1}
-                    placeholder="-1 (随机)"
-                    className="w-full"
-                  />
-                </Form.Item>
-              </>
             )}
-          </>
-        )}
-      </Form>
+
+            {node.type === 'aiImage' && (
+                <div className="space-y-4">
+                    <Divider className="border-dark-border"><span className="text-gray-500 text-xs">生成参数</span></Divider>
+                    
+                    <Form.Item label="API 配置" name="apiConfigId">
+                        <Select
+                            placeholder="选择 API 配置"
+                            onChange={setSelectedConfigId}
+                            options={apiConfigs.map(c => ({ label: c.name, value: c.id }))}
+                        />
+                    </Form.Item>
+
+                    {selectedConfigId && (
+                        <>
+                            <Form.Item label="模型" name="model">
+                                <Select
+                                    placeholder="选择模型"
+                                    loading={loadingModels}
+                                    options={availableModels.map(m => ({ label: m, value: m }))}
+                                />
+                            </Form.Item>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Form.Item label="宽度" name="width">
+                                    <InputNumber className="w-full" min={256} max={2048} step={64} />
+                                </Form.Item>
+                                <Form.Item label="高度" name="height">
+                                    <InputNumber className="w-full" min={256} max={2048} step={64} />
+                                </Form.Item>
+                            </div>
+
+                            <Form.Item label="采样步数" name="steps">
+                                <InputNumber className="w-full" min={1} max={150} />
+                            </Form.Item>
+
+                            <Form.Item label="提示词相关性 (CFG)" name="cfgScale">
+                                <InputNumber className="w-full" min={1} max={20} step={0.5} />
+                            </Form.Item>
+
+                            <Form.Item label="随机种子" name="seed" help="设置为 -1 使用随机种子">
+                                <InputNumber className="w-full" min={-1} placeholder="-1" prefix={<Hash size={14} className="text-gray-500"/>} />
+                            </Form.Item>
+                        </>
+                    )}
+                </div>
+            )}
+            
+            {/* Add more node type configurations here as needed */}
+        </Form>
+      </div>
     </div>
   );
 };

@@ -1,9 +1,10 @@
 /**
  * 工作流编辑器页面
  * 可视化编辑工作流，支持保存、执行和实时状态更新
+ * 性能优化：useMemo, useCallback, React Flow配置优化
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   ReactFlow,
   Background,
@@ -15,6 +16,7 @@ import {
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
+  Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { MainLayout, Sidebar } from '../components/layout';
@@ -25,16 +27,19 @@ import { useWorkflowStore } from '../store/workflowStore';
 import { useExecutionStore } from '../store/executionStore';
 import { socketService } from '../services/socketService';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Spin, Badge } from 'antd';
+import { Spin, Drawer, Button } from 'antd';
+import { Settings2, X } from 'lucide-react';
 
 const EditorContent = () => {
   const { id } = useParams<{ id: string }>();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const navigate = useNavigate();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [showProperties, setShowProperties] = useState(false);
 
   const {
     currentWorkflow,
@@ -56,14 +61,14 @@ const EditorContent = () => {
     clearCurrentExecution,
   } = useExecutionStore();
 
-  // 加载工作流
+  // Load workflow
   useEffect(() => {
     if (id && id !== 'new') {
       loadWorkflow(id);
     }
   }, [id, loadWorkflow]);
 
-  // 同步store中的nodes和edges到ReactFlow
+  // Sync store -> ReactFlow
   useEffect(() => {
     if (currentWorkflow) {
       setNodes(currentWorkflow.nodes as Node[]);
@@ -71,7 +76,7 @@ const EditorContent = () => {
     }
   }, [currentWorkflow, setNodes, setEdges]);
 
-  // 连接WebSocket
+  // WebSocket
   useEffect(() => {
     socketService.connect();
     return () => {
@@ -79,13 +84,13 @@ const EditorContent = () => {
     };
   }, []);
 
-  // 同步ReactFlow的nodes和edges到store
+  // Sync ReactFlow -> store
   useEffect(() => {
     setStoreNodes(nodes);
     setStoreEdges(edges);
   }, [nodes, edges, setStoreNodes, setStoreEdges]);
 
-  // 更新节点状态显示
+  // Update node status from execution store
   useEffect(() => {
     setNodes((nds) =>
       nds.map((node) => {
@@ -113,10 +118,12 @@ const EditorContent = () => {
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
+    setShowProperties(true);
   }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedNode(null);
+    setShowProperties(false);
   }, []);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -153,15 +160,16 @@ const EditorContent = () => {
     [reactFlowInstance, setNodes]
   );
 
-  const handleSave = async () => {
+  // 使用useCallback优化事件处理函数
+  const handleSave = useCallback(async () => {
     try {
       await saveWorkflow();
     } catch (error) {
       console.error('保存失败:', error);
     }
-  };
+  }, [saveWorkflow]);
 
-  const handleExecute = async () => {
+  const handleExecute = useCallback(async () => {
     try {
       clearCurrentExecution();
       const executionId = await executeWorkflow();
@@ -169,9 +177,9 @@ const EditorContent = () => {
     } catch (error) {
       console.error('执行失败:', error);
     }
-  };
+  }, [clearCurrentExecution, executeWorkflow, startExecution]);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     const data = exportWorkflow();
     const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: 'application/json',
@@ -182,9 +190,9 @@ const EditorContent = () => {
     a.download = `${data.name || 'workflow'}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [exportWorkflow]);
 
-  const handleImport = () => {
+  const handleImport = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -206,26 +214,28 @@ const EditorContent = () => {
       }
     };
     input.click();
-  };
+  }, [importWorkflow, setNodes, setEdges]);
 
-  // 渲染节点状态徽章
-  const renderNodeWithStatus = (node: Node) => {
+  const onNodeUpdate = useCallback((updatedNode: Node) => {
+    setNodes((nds) => nds.map((node) => (node.id === updatedNode.id ? updatedNode : node)));
+    setSelectedNode(updatedNode);
+  }, [setNodes]);
+
+  // 使用useMemo优化MiniMap的nodeColor函数
+  const minimapNodeColor = useCallback((node: Node) => {
     const status = nodeStatus.get(node.id);
-    if (!status) return null;
+    if (status?.status === 'running') return '#6366f1';
+    if (status?.status === 'completed') return '#10b981';
+    if (status?.status === 'failed') return '#ef4444';
+    return '#64748b';
+  }, [nodeStatus]);
 
-    let color = 'default';
-    if (status.status === 'running') color = 'processing';
-    if (status.status === 'completed') color = 'success';
-    if (status.status === 'failed') color = 'error';
-
-    return (
-      <Badge
-        status={color as any}
-        text={status.status}
-        style={{ position: 'absolute', top: -20, left: 0 }}
-      />
-    );
-  };
+  // React Flow性能优化配置
+  const proOptions = useMemo(() => ({ hideAttribution: true }), []);
+  const defaultEdgeOptions = useMemo(() => ({
+    animated: false,
+    style: { stroke: '#64748b' }
+  }), []);
 
   return (
     <MainLayout
@@ -234,8 +244,6 @@ const EditorContent = () => {
         onExecute: handleExecute,
         onExport: handleExport,
         onImport: handleImport,
-        saving,
-        executing,
       }}
       sidebar={
         <Sidebar width={280}>
@@ -243,9 +251,9 @@ const EditorContent = () => {
         </Sidebar>
       }
     >
-      <Spin spinning={loading} tip="加载中...">
-        <div className="flex h-full" ref={reactFlowWrapper}>
-          <div className="flex-1 relative">
+      <Spin spinning={loading} tip="加载中..." wrapperClassName="h-full">
+        <div className="flex h-full relative" ref={reactFlowWrapper}>
+          <div className="flex-1 h-full relative">
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -258,28 +266,67 @@ const EditorContent = () => {
               onDrop={onDrop}
               onDragOver={onDragOver}
               nodeTypes={nodeTypes}
+              defaultEdgeOptions={defaultEdgeOptions}
+              proOptions={proOptions}
               fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.1}
+              maxZoom={4}
               className="bg-dark-bg"
+              // 性能优化选项
+              nodesDraggable={true}
+              nodesConnectable={true}
+              elementsSelectable={true}
+              selectNodesOnDrag={false}
             >
-              <Background color="#2a2a2a" gap={16} />
-              <Controls className="bg-dark-surface border-dark-border" />
+              <Background color="#334155" gap={20} size={1} />
+              <Controls className="bg-dark-surface border-dark-border shadow-lg" />
               <MiniMap
-                className="bg-dark-surface border-dark-border"
-                nodeColor={(node) => {
-                  const status = nodeStatus.get(node.id);
-                  if (status?.status === 'running') return '#1890ff';
-                  if (status?.status === 'completed') return '#52c41a';
-                  if (status?.status === 'failed') return '#ff4d4f';
-                  return '#4a4a4a';
-                }}
+                className="!bg-dark-surface !border-dark-border shadow-lg m-4"
+                nodeColor={minimapNodeColor}
+                maskColor="rgba(15, 23, 42, 0.7)"
+                pannable
+                zoomable
               />
+              <Panel position="top-right" className="m-4">
+                 {/* Optional: Add overlay controls here */}
+              </Panel>
             </ReactFlow>
           </div>
-          {selectedNode && (
-            <div className="w-80 border-l border-dark-border bg-dark-surface">
-              <PropertiesPanel node={selectedNode} />
-            </div>
-          )}
+
+          {/* Properties Panel - Desktop: Sidebar, Mobile: Drawer */}
+          <div className={`hidden lg:block w-80 border-l border-dark-border bg-dark-surface transition-all duration-300 ${showProperties ? 'mr-0' : '-mr-80'}`}>
+             <div className="flex justify-between items-center p-4 border-b border-dark-border">
+                <h3 className="font-semibold text-white flex items-center gap-2">
+                   <Settings2 size={16} /> 属性设置
+                </h3>
+                <Button type="text" size="small" icon={<X size={16} />} onClick={() => setShowProperties(false)} />
+             </div>
+             {selectedNode ? (
+                <PropertiesPanel node={selectedNode} onUpdate={onNodeUpdate} />
+             ) : (
+                <div className="p-8 text-center text-gray-500">
+                   请选择一个节点以编辑属性
+                </div>
+             )}
+          </div>
+
+          <Drawer
+            title="属性设置"
+            placement="right"
+            onClose={() => setShowProperties(false)}
+            open={showProperties}
+            className="lg:hidden"
+            width={320}
+          >
+             {selectedNode ? (
+                <PropertiesPanel node={selectedNode} onUpdate={onNodeUpdate} />
+             ) : (
+                <div className="p-8 text-center text-gray-500">
+                   请选择一个节点以编辑属性
+                </div>
+             )}
+          </Drawer>
         </div>
       </Spin>
     </MainLayout>

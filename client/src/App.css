@@ -1,31 +1,70 @@
+/* React Flow Customization */
+
 .react-flow__node {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  padding: 12px;
-  color: white;
+  @apply rounded-lg border border-dark-border bg-dark-surface text-dark-text shadow-lg transition-all duration-200;
 }
 
 .react-flow__node:hover {
-  border-color: #3b82f6;
+  @apply border-primary shadow-glow-sm;
 }
 
 .react-flow__node.selected {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  @apply border-primary shadow-glow ring-1 ring-primary;
 }
 
 .react-flow__handle {
-  background: #3b82f6;
-  width: 10px;
-  height: 10px;
+  @apply w-3 h-3 bg-dark-surface border-2 border-primary rounded-full transition-transform duration-200;
+}
+
+.react-flow__handle:hover {
+  @apply bg-primary scale-125;
 }
 
 .react-flow__edge-path {
-  stroke: #3b82f6;
+  stroke: #64748b; /* slate-500 */
   stroke-width: 2;
+  transition: stroke 0.2s, stroke-width 0.2s;
+}
+
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #818cf8; /* indigo-400 */
+  stroke-width: 3;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: #60a5fa;
+  stroke: #6366f1; /* indigo-500 */
+  stroke-width: 3;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.5));
+}
+
+.react-flow__controls {
+  @apply bg-dark-surface border border-dark-border rounded-lg shadow-xl overflow-hidden;
+}
+
+.react-flow__controls-button {
+  @apply bg-dark-surface border-b border-dark-border text-dark-textSecondary p-2 hover:bg-dark-surfaceHighlight hover:text-primary transition-colors;
+}
+
+.react-flow__controls-button:last-child {
+  @apply border-b-0;
+}
+
+.react-flow__controls-button svg {
+  @apply fill-current w-4 h-4 max-h-4 max-w-4;
+}
+
+.react-flow__minimap {
+  @apply bg-dark-surface border border-dark-border rounded-lg shadow-xl !important;
+}
+
+.react-flow__minimap-mask {
+  @apply fill-dark-bg/60 !important;
+}
+
+.react-flow__minimap-node {
+  @apply fill-dark-surfaceHighlight stroke-none !important;
+}
+
+.react-flow__background {
+  @apply bg-dark-bg;
 }

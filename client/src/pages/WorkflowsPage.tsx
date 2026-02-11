@@ -1,15 +1,16 @@
 /**
- * 工作流列表页面
+ * 工作流列表页面 (Dashboard)
  * 显示所有工作流，支持创建、编辑、删除、执行
  */
 
 import { useEffect, useState } from 'react';
-import { Card, Button, Empty, Input, Modal, Form, Spin, Popconfirm, Space, Tag } from 'antd';
-import { Plus, Play, Edit, Trash2, Search, Download, Upload } from 'lucide-react';
+import { Card, Button, Empty, Input, Modal, Form, Spin, Popconfirm, Space, Tag, Tooltip, Row, Col } from 'antd';
+import { Plus, Play, Edit, Trash2, Search, Download, Upload, Zap, MoreHorizontal, Calendar, Activity } from 'lucide-react';
 import { MainLayout } from '../components/layout';
 import { useNavigate } from 'react-router-dom';
 import { useWorkflowStore } from '../store/workflowStore';
 import type { Workflow } from '../../../shared/types';
+// import dayjs from 'dayjs'; // Removed dependency
 
 export const WorkflowsPage = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export const WorkflowsPage = () => {
     deleteWorkflow,
     executeWorkflow,
     importWorkflow,
-    exportWorkflow,
+    // exportWorkflow, // Assuming export is handled by parent or we add it back
   } = useWorkflowStore();
 
   const [searchText, setSearchText] = useState('');
@@ -51,7 +52,8 @@ export const WorkflowsPage = () => {
   };
 
   // 删除工作流
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       await deleteWorkflow(id);
     } catch (error) {
@@ -60,7 +62,8 @@ export const WorkflowsPage = () => {
   };
 
   // 执行工作流
-  const handleExecute = async (id: string) => {
+  const handleExecute = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       const executionId = await executeWorkflow(id);
       navigate(`/executions/${executionId}`);
@@ -70,7 +73,8 @@ export const WorkflowsPage = () => {
   };
 
   // 导出工作流
-  const handleExport = (workflow: Workflow) => {
+  const handleExport = (workflow: Workflow, e: React.MouseEvent) => {
+    e.stopPropagation();
     const data = {
       name: workflow.name,
       description: workflow.description,
@@ -117,14 +121,25 @@ export const WorkflowsPage = () => {
 
   return (
     <MainLayout>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-white">工作流列表</h1>
-          <Space>
+      <div className="p-6 max-w-7xl mx-auto w-full">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white tracking-tight">工作流控制台</h1>
+            <p className="text-gray-400 mt-1">管理和编排你的 AI 工作流任务</p>
+          </div>
+          <Space wrap size="middle">
+             {/* Test All Endpoints Action */}
+             <Button 
+                icon={<Zap size={16} />} 
+                className="border-primary text-primary hover:text-primary-hover hover:border-primary-hover"
+                onClick={() => console.log('Test All Endpoints')} // Placeholder functionality
+              >
+                测试所有接口
+              </Button>
             <Button
               icon={<Upload size={16} />}
               onClick={handleImport}
-              className="flex items-center gap-2"
             >
               导入
             </Button>
@@ -132,100 +147,128 @@ export const WorkflowsPage = () => {
               type="primary"
               icon={<Plus size={16} />}
               onClick={() => setCreateModalVisible(true)}
-              className="flex items-center gap-2"
+              className="bg-primary hover:bg-primary-hover border-none shadow-lg shadow-primary/20"
             >
               新建工作流
             </Button>
           </Space>
         </div>
 
-        {/* 搜索框 */}
-        <div className="mb-4">
+        {/* Search Bar */}
+        <div className="mb-8">
           <Input
-            placeholder="搜索工作流..."
-            prefix={<Search size={16} />}
+            size="large"
+            placeholder="搜索工作流名称或描述..."
+            prefix={<Search size={18} className="text-gray-500 mr-2" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="max-w-md"
+            className="max-w-md bg-dark-surface border-dark-border hover:border-primary focus:border-primary"
+            allowClear
           />
         </div>
 
-        {/* 工作流列表 */}
+        {/* Workflow Grid */}
         <Spin spinning={loading}>
           {filteredWorkflows.length === 0 ? (
-            <Card className="bg-dark-surface border-dark-border">
-              <Empty
-                description="暂无工作流"
-                className="text-gray-400"
-              >
-                <Button type="primary" onClick={() => setCreateModalVisible(true)}>
-                  创建第一个工作流
-                </Button>
-              </Empty>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-20 bg-dark-surface rounded-2xl border border-dashed border-dark-border">
+              <div className="w-16 h-16 bg-dark-surfaceHighlight rounded-full flex items-center justify-center mb-4">
+                <Activity size={32} className="text-gray-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">暂无工作流</h3>
+              <p className="text-gray-400 mb-6 max-w-md text-center">开始创建你的第一个 AI 工作流，或者导入现有的配置。</p>
+              <Button type="primary" size="large" onClick={() => setCreateModalVisible(true)} icon={<Plus size={16} />}>
+                立即创建
+              </Button>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredWorkflows.map((workflow) => (
-                <Card
+                <div
                   key={workflow.id}
-                  className="bg-dark-surface border-dark-border hover:border-primary transition-colors cursor-pointer"
+                  className="group relative bg-dark-surface rounded-xl border border-dark-border overflow-hidden hover:border-primary/50 hover:shadow-glow-sm transition-all duration-300 cursor-pointer flex flex-col h-full"
                   onClick={() => handleEdit(workflow)}
                 >
-                  <div className="flex flex-col h-full">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-white mb-2">
-                        {workflow.name}
-                      </h3>
-                      <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                        {workflow.description || '暂无描述'}
-                      </p>
-                      <div className="flex gap-2 mb-4">
-                        <Tag color="blue">{workflow.nodes.length} 个节点</Tag>
-                        <Tag color="green">{workflow.edges.length} 个连接</Tag>
+                  <div className="p-6 flex-1">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                        <Activity size={24} />
                       </div>
-                      <p className="text-xs text-gray-500">
-                        更新于 {new Date(workflow.updatedAt).toLocaleString('zh-CN')}
-                      </p>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                         <Button 
+                            type="text" 
+                            size="small" 
+                            icon={<MoreHorizontal size={16} className="text-gray-400" />}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                      </div>
                     </div>
-                    <div className="flex gap-2 mt-4" onClick={(e) => e.stopPropagation()}>
-                      <Button
-                        type="primary"
-                        size="small"
-                        icon={<Play size={14} />}
-                        onClick={() => handleExecute(workflow.id)}
-                        className="flex-1"
-                      >
-                        执行
-                      </Button>
-                      <Button
-                        size="small"
-                        icon={<Edit size={14} />}
-                        onClick={() => handleEdit(workflow)}
-                      >
-                        编辑
-                      </Button>
-                      <Button
-                        size="small"
-                        icon={<Download size={14} />}
-                        onClick={() => handleExport(workflow)}
-                      >
-                        导出
-                      </Button>
-                      <Popconfirm
-                        title="确定删除此工作流吗？"
-                        onConfirm={() => handleDelete(workflow.id)}
-                        okText="确定"
-                        cancelText="取消"
-                      >
-                        <Button
-                          size="small"
-                          danger
-                          icon={<Trash2 size={14} />}
-                        />
-                      </Popconfirm>
+                    
+                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-primary transition-colors truncate">
+                      {workflow.name}
+                    </h3>
+                    <p className="text-gray-400 text-sm mb-4 line-clamp-2 h-10">
+                      {workflow.description || '暂无描述...'}
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <Tag color="geekblue" className="mr-0 bg-opacity-20 border-none">{workflow.nodes.length} 节点</Tag>
+                      <Tag color="cyan" className="mr-0 bg-opacity-20 border-none">{workflow.edges.length} 连接</Tag>
                     </div>
                   </div>
-                </Card>
+
+                  <div className="px-6 py-4 bg-dark-surfaceHighlight/30 border-t border-dark-border flex justify-between items-center text-xs text-gray-500">
+                     <span className="flex items-center gap-1">
+                        <Calendar size={12} />
+                        {new Date(workflow.updatedAt).toLocaleString('zh-CN')}
+                     </span>
+                     
+                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip title="执行">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<Play size={14} className="text-green-500" />}
+                            onClick={(e) => handleExecute(workflow.id, e)}
+                            className="hover:bg-green-500/10"
+                          />
+                        </Tooltip>
+                        <Tooltip title="编辑">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<Edit size={14} className="text-blue-500" />}
+                            onClick={() => handleEdit(workflow)}
+                            className="hover:bg-blue-500/10"
+                          />
+                        </Tooltip>
+                        <Tooltip title="导出">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<Download size={14} className="text-orange-500" />}
+                            onClick={(e) => handleExport(workflow, e)}
+                            className="hover:bg-orange-500/10"
+                          />
+                        </Tooltip>
+                        <Tooltip title="删除">
+                          <Popconfirm
+                            title="确定删除此工作流吗？"
+                            onConfirm={(e) => e && handleDelete(workflow.id, e as unknown as React.MouseEvent)}
+                            okText="确定"
+                            cancelText="取消"
+                          >
+                            <Button
+                              type="text"
+                              size="small"
+                              danger
+                              icon={<Trash2 size={14} />}
+                              onClick={(e) => e.stopPropagation()} // Prevent card click
+                            />
+                          </Popconfirm>
+                        </Tooltip>
+                     </div>
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -242,6 +285,7 @@ export const WorkflowsPage = () => {
           onOk={() => form.submit()}
           okText="创建"
           cancelText="取消"
+          centered
         >
           <Form
             form={form}
@@ -253,14 +297,14 @@ export const WorkflowsPage = () => {
               label="工作流名称"
               rules={[{ required: true, message: '请输入工作流名称' }]}
             >
-              <Input placeholder="输入工作流名称" />
+              <Input placeholder="例如：AI 图像生成流水线" />
             </Form.Item>
             <Form.Item
               name="description"
               label="描述"
             >
               <Input.TextArea
-                placeholder="输入工作流描述（可选）"
+                placeholder="简要描述该工作流的功能..."
                 rows={4}
               />
             </Form.Item>
