@@ -1,0 +1,11 @@
+{
+  "name": "ai-workflow-shared",
+  "version": "1.0.0",
+  "description": "AI工作流系统共享类型和常量",
+  "main": "types/index.ts",
+  "types": "types/index.ts",
+  "scripts": {},
+  "keywords": ["ai", "workflow", "types"],
+  "author": "",
+  "license": "MIT"
+}
