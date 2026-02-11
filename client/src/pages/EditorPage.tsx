@@ -1,4 +1,9 @@
-import { useState, useCallback, useRef } from 'react';
+/**
+ * 工作流编辑器页面
+ * 可视化编辑工作流，支持保存、执行和实时状态更新
+ */
+
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   ReactFlow,
   Background,
@@ -16,13 +21,90 @@ import { MainLayout, Sidebar } from '../components/layout';
 import { NodePanel } from '../components/editor/NodePanel';
 import { PropertiesPanel } from '../components/editor/PropertiesPanel';
 import { nodeTypes } from '../components/nodes';
+import { useWorkflowStore } from '../store/workflowStore';
+import { useExecutionStore } from '../store/executionStore';
+import { socketService } from '../services/socketService';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Spin, Badge } from 'antd';
 
 const EditorContent = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
+  const {
+    currentWorkflow,
+    loading,
+    saving,
+    executing,
+    loadWorkflow,
+    saveWorkflow,
+    executeWorkflow,
+    importWorkflow,
+    exportWorkflow,
+    setNodes: setStoreNodes,
+    setEdges: setStoreEdges,
+  } = useWorkflowStore();
+
+  const {
+    nodeStatus,
+    startExecution,
+    clearCurrentExecution,
+  } = useExecutionStore();
+
+  // 加载工作流
+  useEffect(() => {
+    if (id && id !== 'new') {
+      loadWorkflow(id);
+    }
+  }, [id, loadWorkflow]);
+
+  // 同步store中的nodes和edges到ReactFlow
+  useEffect(() => {
+    if (currentWorkflow) {
+      setNodes(currentWorkflow.nodes as Node[]);
+      setEdges(currentWorkflow.edges as any[]);
+    }
+  }, [currentWorkflow, setNodes, setEdges]);
+
+  // 连接WebSocket
+  useEffect(() => {
+    socketService.connect();
+    return () => {
+      socketService.disconnect();
+    };
+  }, []);
+
+  // 同步ReactFlow的nodes和edges到store
+  useEffect(() => {
+    setStoreNodes(nodes);
+    setStoreEdges(edges);
+  }, [nodes, edges, setStoreNodes, setStoreEdges]);
+
+  // 更新节点状态显示
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((node) => {
+        const status = nodeStatus.get(node.id);
+        if (status) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              status: status.status,
+              result: status.result,
+              error: status.error,
+            },
+          };
+        }
+        return node;
+      })
+    );
+  }, [nodeStatus, setNodes]);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -58,7 +140,12 @@ const EditorContent = () => {
         id: `${type}-${Date.now()}`,
         type,
         position,
-        data: { label: `${type} 节点` },
+        data: { 
+          label: `${type} 节点`,
+          inputs: [],
+          outputs: [],
+          config: {},
+        },
       };
 
       setNodes((nds) => [...nds, newNode]);
@@ -66,24 +153,35 @@ const EditorContent = () => {
     [reactFlowInstance, setNodes]
   );
 
-  const handleSave = () => {
-    console.log('保存工作流', { nodes, edges });
+  const handleSave = async () => {
+    try {
+      await saveWorkflow();
+    } catch (error) {
+      console.error('保存失败:', error);
+    }
   };
 
-  const handleExecute = () => {
-    console.log('执行工作流', { nodes, edges });
+  const handleExecute = async () => {
+    try {
+      clearCurrentExecution();
+      const executionId = await executeWorkflow();
+      startExecution(executionId);
+    } catch (error) {
+      console.error('执行失败:', error);
+    }
   };
 
   const handleExport = () => {
-    const workflow = { nodes, edges };
-    const blob = new Blob([JSON.stringify(workflow, null, 2)], {
+    const data = exportWorkflow();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
       type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'workflow.json';
+    a.download = `${data.name || 'workflow'}.json`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleImport = () => {
@@ -96,9 +194,10 @@ const EditorContent = () => {
         const reader = new FileReader();
         reader.onload = (event) => {
           try {
-            const workflow = JSON.parse(event.target?.result as string);
-            setNodes(workflow.nodes || []);
-            setEdges(workflow.edges || []);
+            const data = JSON.parse(event.target?.result as string);
+            importWorkflow(data);
+            setNodes(data.nodes || []);
+            setEdges(data.edges || []);
           } catch (error) {
             console.error('导入失败:', error);
           }
@@ -109,6 +208,25 @@ const EditorContent = () => {
     input.click();
   };
 
+  // 渲染节点状态徽章
+  const renderNodeWithStatus = (node: Node) => {
+    const status = nodeStatus.get(node.id);
+    if (!status) return null;
+
+    let color = 'default';
+    if (status.status === 'running') color = 'processing';
+    if (status.status === 'completed') color = 'success';
+    if (status.status === 'failed') color = 'error';
+
+    return (
+      <Badge
+        status={color as any}
+        text={status.status}
+        style={{ position: 'absolute', top: -20, left: 0 }}
+      />
+    );
+  };
+
   return (
     <MainLayout
       headerProps={{
@@ -116,6 +234,8 @@ const EditorContent = () => {
         onExecute: handleExecute,
         onExport: handleExport,
         onImport: handleImport,
+        saving,
+        executing,
       }}
       sidebar={
         <Sidebar width={280}>
@@ -123,37 +243,45 @@ const EditorContent = () => {
         </Sidebar>
       }
     >
-      <div className="flex h-full" ref={reactFlowWrapper}>
-        <div className="flex-1 relative">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={onNodeClick}
-            onPaneClick={onPaneClick}
-            onInit={setReactFlowInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            nodeTypes={nodeTypes}
-            fitView
-            className="bg-dark-bg"
-          >
-            <Background color="#2a2a2a" gap={16} />
-            <Controls className="bg-dark-surface border-dark-border" />
-            <MiniMap
-              className="bg-dark-surface border-dark-border"
-              nodeColor="#4a4a4a"
-            />
-          </ReactFlow>
-        </div>
-        {selectedNode && (
-          <div className="w-80 border-l border-dark-border bg-dark-surface">
-            <PropertiesPanel node={selectedNode} />
+      <Spin spinning={loading} tip="加载中...">
+        <div className="flex h-full" ref={reactFlowWrapper}>
+          <div className="flex-1 relative">
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              onPaneClick={onPaneClick}
+              onInit={setReactFlowInstance}
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+              nodeTypes={nodeTypes}
+              fitView
+              className="bg-dark-bg"
+            >
+              <Background color="#2a2a2a" gap={16} />
+              <Controls className="bg-dark-surface border-dark-border" />
+              <MiniMap
+                className="bg-dark-surface border-dark-border"
+                nodeColor={(node) => {
+                  const status = nodeStatus.get(node.id);
+                  if (status?.status === 'running') return '#1890ff';
+                  if (status?.status === 'completed') return '#52c41a';
+                  if (status?.status === 'failed') return '#ff4d4f';
+                  return '#4a4a4a';
+                }}
+              />
+            </ReactFlow>
           </div>
-        )}
-      </div>
+          {selectedNode && (
+            <div className="w-80 border-l border-dark-border bg-dark-surface">
+              <PropertiesPanel node={selectedNode} />
+            </div>
+          )}
+        </div>
+      </Spin>
     </MainLayout>
   );
 };
