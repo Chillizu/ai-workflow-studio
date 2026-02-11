@@ -3,7 +3,8 @@
  * 配置Axios实例，设置baseURL和拦截器
  */
 
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
+import axios from 'axios';
+import type { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { message } from 'antd';
 
 // API基础URL

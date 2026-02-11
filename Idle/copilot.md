@@ -797,4 +797,25 @@ NodeAPI/
 - 项目路径: `d:/Code/NodeAPI`
 - Git分支: master
 - 最后更新: 2026-02-11
-- 当前阶段: 阶段4完成（AI API集成），准备进入阶段6（测试和优化）
+- 当前阶段: 阶段4完成（AI API集成），修复了Axios类型导入导致的Vite运行时错误
+
+### 阶段11：修复 Axios 类型导入错误 ✅
+**完成时间**: 2026-02-11
+
+#### 问题描述
+浏览器报错：`Uncaught SyntaxError: The requested module '/node_modules/.vite/deps/axios.js' does not provide an export named 'AxiosInstance'`。
+
+#### 根本原因
+在 axios v1.x+ 中，`AxiosInstance`、`AxiosError` 等是类型（Types），在 Vite 构建的 ESM 环境下，必须显式使用 `import type` 导入，否则 Vite 会尝试在运行时从 axios 模块中查找这些导出，从而导致 SyntaxError。
+
+#### 已完成修复
+1. **修改 [`client/src/services/api.ts`](client/src/services/api.ts)**
+   - 将 `AxiosError`, `AxiosInstance`, `InternalAxiosRequestConfig`, `AxiosResponse` 的导入改为 `import type`。
+   - 保持 `import axios from 'axios'` 用于运行时调用。
+2. **清理缓存**
+   - 删除了 `client/node_modules/.vite` 目录以强制 Vite 重新预构建依赖。
+3. **验证**
+   - 经测试，页面能够正常加载，不再出现上述 SyntaxError。
+
+#### 修改文件清单
+1. `client/src/services/api.ts` - 修复 axios 类型导入方式
