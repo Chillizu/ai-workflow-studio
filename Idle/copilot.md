@@ -66,7 +66,7 @@ AI生图工作流系统 - 一个基于Node.js的可视化工作流编辑器，�
 - Commit: `b0cf818` - "feat: 实现前端核心功能 - 工作流编辑器和基础UI"
 - 分支: master
 
-### 阶段3：后端核心功能开发 ✅ (刚完成)
+### 阶段3：后端核心功能开发 ✅
 **完成时间**: 2026-02-11
 
 #### 已完成功能
@@ -159,30 +159,127 @@ AI生图工作流系统 - 一个基于Node.js的可视化工作流编辑器，�
 ✅ WebSocket服务已启动
 ✅ 数据目录已初始化
 
+### 阶段5：前后端集成 ✅
+**完成时间**: 2026-02-11
+
+#### 已完成功能
+
+1. **前端API服务层**
+   - [`api.ts`](client/src/services/api.ts) - Axios客户端配置，请求/响应拦截器
+   - [`workflowApi.ts`](client/src/services/workflowApi.ts) - 工作流API服务
+     * getWorkflows() - 获取工作流列表
+     * getWorkflow(id) - 获取工作流详情
+     * createWorkflow(data) - 创建工作流
+     * updateWorkflow(id, data) - 更新工作流
+     * deleteWorkflow(id) - 删除工作流
+     * executeWorkflow(id) - 执行工作流
+   - [`executionApi.ts`](client/src/services/executionApi.ts) - 执行API服务
+     * getExecutions() - 获取执行历史
+     * getExecution(id) - 获取执行详情
+     * getExecutionsByWorkflow(workflowId) - 根据工作流ID获取执行历史
+   - [`nodeApi.ts`](client/src/services/nodeApi.ts) - 节点API服务
+     * getNodeTypes() - 获取节点类型列表
+   - [`configApi.ts`](client/src/services/configApi.ts) - 配置API服务
+     * getAPIConfigs() - 获取API配置
+     * createAPIConfig(data) - 创建配置
+     * updateAPIConfig(id, data) - 更新配置
+     * deleteAPIConfig(id) - 删除配置
+   - [`fileApi.ts`](client/src/services/fileApi.ts) - 文件API服务
+     * uploadFile(file) - 上传文件
+     * getFileUrl(filename) - 获取文件URL
+
+2. **WebSocket集成**
+   - [`socketService.ts`](client/src/services/socketService.ts) - Socket.io客户端服务
+     * 连接管理（自动重连）
+     * 事件监听（execution:start/progress/complete/error, node:start/complete/error）
+     * 订阅/取消订阅执行
+     * 事件分发机制
+
+3. **状态管理增强**
+   - [`workflowStore.ts`](client/src/store/workflowStore.ts) - 增强的工作流Store
+     * 工作流列表管理
+     * 当前工作流状态
+     * 加载/保存/执行状态
+     * API调用集成
+     * 导入/导出功能
+   - [`executionStore.ts`](client/src/store/executionStore.ts) - 执行Store
+     * 执行记录管理
+     * 实时执行状态更新
+     * 节点状态跟踪
+     * WebSocket事件处理
+
+4. **页面功能实现**
+   - [`WorkflowsPage.tsx`](client/src/pages/WorkflowsPage.tsx) - 工作流列表页面
+     * 显示工作流卡片列表
+     * 创建/编辑/删除工作流
+     * 执行工作流
+     * 搜索和筛选
+     * 导入/导出工作流
+   - [`EditorPage.tsx`](client/src/pages/EditorPage.tsx) - 工作流编辑器页面
+     * 加载工作流数据
+     * 保存工作流到后端
+     * 执行工作流
+     * 实时显示执行状态（节点状态颜色变化）
+     * 显示执行结果
+     * WebSocket实时更新
+   - [`APISettingsPage.tsx`](client/src/pages/APISettingsPage.tsx) - API配置页面
+     * 显示API配置列表
+     * 添加/编辑/删除配置
+     * 表单验证
+   - [`ExecutionsPage.tsx`](client/src/pages/ExecutionsPage.tsx) - 执行历史页面
+     * 显示执行记录列表
+     * 查看执行详情
+     * 显示执行结果和错误信息
+     * 执行时长计算
+
+5. **用户体验增强**
+   - Loading状态（Spin组件）
+   - 错误提示（message.error）
+   - 成功提示（message.success）
+   - 确认对话框（Popconfirm）
+   - 状态标签（Tag）
+   - 响应式设计
+
+6. **环境配置**
+   - [`client/.env`](client/.env) - 前端环境变量配置
+     * VITE_API_URL=http://localhost:3000
+
+#### 技术特点
+- 完整的前后端通信
+- WebSocket实时更新
+- 统一的错误处理
+- 良好的用户反馈
+- TypeScript类型安全
+- 模块化API服务
+
+#### Git提交
+- Commit: `da20a5e` - "feat: 阶段5 - 前后端集成完成"
+- 分支: master
+- 新增文件: 8个
+- 修改文件: 5个
+- 代码行数: +1638行
+
+#### 系统状态
+✅ 前端开发服务器运行在 http://localhost:5173
+✅ 后端API服务器运行在 http://localhost:3000
+✅ WebSocket连接正常
+✅ 前后端通信正常
+
 ## 下一步计划
 
-### 阶段4：AI API集成
+### 阶段4：AI API集成（待开始）
 1. 实现OpenAI DALL-E集成
 2. 实现Stable Diffusion集成
 3. 实现API密钥管理
 4. 实现请求限流和错误重试
-
-### 阶段4：前后端集成
-1. 连接前端和后端API
-2. 实现实时执行状态更新
-3. 实现错误处理和用户反馈
-
-### 阶段5：AI API集成
-1. 实现OpenAI DALL-E集成
-2. 实现Stable Diffusion集成
-3. 实现API密钥管理
-4. 实现请求限流和错误重试
+5. 完善AI节点处理器
 
 ### 阶段6：测试和优化
-1. 单元测试
-2. 集成测试
-3. 性能优化
-4. UI/UX优化
+1. 端到端功能测试
+2. 单元测试
+3. 集成测试
+4. 性能优化
+5. UI/UX优化
 
 ## 技术栈
 
@@ -219,8 +316,10 @@ NodeAPI/
 │   │   │   ├── layout/   # 布局组件
 │   │   │   └── nodes/    # 节点组件
 │   │   ├── pages/        # 页面
+│   │   ├── services/     # API服务
 │   │   ├── store/        # 状态管理
 │   │   └── App.tsx       # 主应用
+│   ├── .env              # 环境变量
 │   ├── tailwind.config.js
 │   └── package.json
 ├── server/                # 后端代码
@@ -246,11 +345,12 @@ NodeAPI/
 ## 重要提示
 
 ### 给其他客户端AI的说明
-1. **项目上下文**: 这是一个AI工作流系统，前端已基本完成，后端待开发
-2. **当前状态**: 前端核心功能已实现并提交到git
+1. **项目上下文**: 这是一个AI工作流系统，前后端集成已完成
+2. **当前状态**: 前后端通信正常，可以创建、保存、执行工作流
 3. **工作方式**: 请在继续工作时更新此文件，保持上下文同步
 4. **代码规范**: 使用TypeScript严格模式，遵循项目现有代码风格
 5. **提交规范**: 使用语义化提交信息（feat/fix/docs/style/refactor等）
+6. **测试方式**: 使用文本节点测试工作流，AI节点暂时为占位实现
 
 ### 关键文件
 - [`/shared/types/index.ts`](../shared/types/index.ts) - 共享类型定义
@@ -260,6 +360,8 @@ NodeAPI/
 - [`/plans/execution-engine.md`](../plans/execution-engine.md) - 执行引擎设计
 - [`/server/src/index.ts`](../server/src/index.ts) - 后端服务器入口
 - [`/server/src/engine/engine.ts`](../server/src/engine/engine.ts) - 工作流执行引擎
+- [`/client/src/services/api.ts`](../client/src/services/api.ts) - 前端API客户端
+- [`/client/src/store/workflowStore.ts`](../client/src/store/workflowStore.ts) - 工作流状态管理
 
 ## 已知问题
 - 无
@@ -273,8 +375,19 @@ NodeAPI/
 6. API端点的单元测试
 7. 执行引擎的性能优化
 8. 文件上传的进度显示
+9. AI API集成（OpenAI、Stable Diffusion）
+10. 请求限流和错误重试机制
+
+## 测试建议
+1. 创建简单的文本工作流测试端到端功能
+2. 测试工作流的保存和加载
+3. 测试工作流的执行和实时状态更新
+4. 测试API配置的CRUD操作
+5. 测试执行历史的查看
+6. 测试工作流的导入导出
 
 ## 联系方式
 - 项目路径: `d:/Code/NodeAPI`
 - Git分支: master
 - 最后更新: 2026-02-11
+- 当前阶段: 阶段5完成，准备进入阶段4（AI API集成）
