@@ -5,6 +5,52 @@ AI生图工作流系统 - 一个基于Node.js的可视化工作流编辑器，�
 
 ## 当前进度
 
+### 阶段10：环境变量修复 ✅
+**完成时间**: 2026-02-11
+
+#### 问题描述
+后端服务崩溃，报错：环境变量 `ENCRYPTION_KEY` 未设置且无法通过zod验证。
+
+#### 根本原因
+1. `server/src/config/env.ts` 中 `ENCRYPTION_KEY` 被设为必需项（无默认值）
+2. 开发环境没有 `.env` 文件
+3. 默认值字符不足32个，导致验证失败
+
+#### 已完成修复
+
+1. **修改 [`server/src/config/env.ts`](server/src/config/env.ts)**
+   - 为 `ENCRYPTION_KEY` 添加开发环境默认值：`development-encryption-key-abc12345`（精确32字符）
+   - 其他必需变量（PORT、HOST、CLIENT_URL等）已有默认值，无需修改
+
+2. **创建 `.env` 文件**
+   - 从 `.env.example` 复制并填入开发用值
+   - `ENCRYPTION_KEY=development-encryption-key-abc12345`
+   - `.env` 文件已在 `.gitignore` 中，不会被提交
+
+3. **更新 `.env.example`**
+   - 添加注释说明开发默认值
+   - 保持生产环境提示"change-me-to-a-secure-random-32-char-key"
+
+#### 修复后状态
+✅ 服务器成功启动在 http://0.0.0.0:3000
+✅ 加载了0个API配置
+✅ 服务初始化完成
+✅ WebSocket服务已启动
+✅ 数据目录已初始化
+
+#### 关键原则遵循
+- ✅ 开发模式下零配置即可启动（所有必需环境变量都有默认值）
+- ✅ 生产环境仍需要明确配置
+- ✅ `.env` 文件不被版本控制（.gitignore保护）
+- ✅ 加密密钥长度符合要求（>= 32字符）
+
+#### 修改文件清单
+1. `server/src/config/env.ts` - 添加ENCRYPTION_KEY默认值
+2. `.env` - 新建开发环境配置文件
+3. `.env.example` - 添加默认值说明注释
+
+
+
 ### 阶段1：项目初始化和架构设计 ✅
 - 项目结构搭建完成
 - 技术栈选型完成

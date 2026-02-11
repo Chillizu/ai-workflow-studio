@@ -13,7 +13,7 @@ const envSchema = z.object({
   PORT: z.string().transform(Number).default('3000'),
   HOST: z.string().default('0.0.0.0'),
   CLIENT_URL: z.string().default('http://localhost:5173'),
-  ENCRYPTION_KEY: z.string().min(32, 'Encryption key must be at least 32 characters long'),
+  ENCRYPTION_KEY: z.string().min(32, 'Encryption key must be at least 32 characters long').default('development-encryption-key-abc12345'),
   UPLOAD_DIR: z.string().default('./uploads'),
   DATA_DIR: z.string().default('./data'),
 });
