@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { env } from '../config/env';
 
 /**
  * 错误处理中间件
@@ -30,7 +31,7 @@ export const errorHandler = (
   // 默认错误
   return res.status(500).json({
     error: '服务器内部错误',
-    message: process.env.NODE_ENV === 'development' ? err.message : '发生了一个错误'
+    message: env.NODE_ENV === 'development' ? err.message : '发生了一个错误'
   });
 };
 

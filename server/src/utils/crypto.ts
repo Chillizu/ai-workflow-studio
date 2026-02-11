@@ -4,13 +4,12 @@
  */
 
 import crypto from 'crypto';
+import { env } from '../config/env';
 
 // 加密算法
 const ALGORITHM = 'aes-256-cbc';
-// 加密密钥（应该从环境变量读取，这里使用默认值）
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'default-encryption-key-change-me!!';
 // 确保密钥长度为32字节
-const KEY = crypto.createHash('sha256').update(ENCRYPTION_KEY).digest();
+const KEY = crypto.createHash('sha256').update(env.ENCRYPTION_KEY).digest();
 
 /**
  * 加密文本

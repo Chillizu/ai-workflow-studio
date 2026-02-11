@@ -1,9 +1,8 @@
 import { EventEmitter } from 'events';
 import { v4 as uuid } from 'uuid';
-import { Workflow } from '../../../shared/types';
+import { Workflow, BaseNode, Edge } from '../../../shared/types';
 import { ExecutionResult } from '../types';
 import { WorkflowValidator } from './validator';
-import { TopologicalSorter } from './sorter';
 import { ExecutionContext } from './context';
 import { NodeExecutor } from './executor';
 import { ProcessorRegistry } from './registry';
@@ -11,10 +10,10 @@ import { ProcessorRegistry } from './registry';
 /**
  * 工作流执行引擎
  * 协调整个工作流的执行流程
+ * 支持并行执行无依赖关系的节点
  */
 export class WorkflowEngine {
   private validator: WorkflowValidator;
-  private sorter: TopologicalSorter;
   private executor: NodeExecutor;
   private eventEmitter: EventEmitter;
   
@@ -23,13 +22,71 @@ export class WorkflowEngine {
     eventEmitter: EventEmitter
   ) {
     this.validator = new WorkflowValidator(processorRegistry);
-    this.sorter = new TopologicalSorter();
     this.executor = new NodeExecutor(processorRegistry, eventEmitter);
     this.eventEmitter = eventEmitter;
   }
   
   /**
-   * 执行工作流
+   * 将节点分组为执行层级（同一层级的节点可以并行执行）
+   */
+  private groupNodesByLevel(nodes: BaseNode[], edges: Edge[]): string[][] {
+    const levels: string[][] = [];
+    const inDegree = new Map<string, number>();
+    const dependencies = new Map<string, Set<string>>();
+    
+    // 初始化入度和依赖关系
+    nodes.forEach(node => {
+      inDegree.set(node.id, 0);
+      dependencies.set(node.id, new Set());
+    });
+    
+    // 计算入度
+    edges.forEach(edge => {
+      const current = inDegree.get(edge.target) || 0;
+      inDegree.set(edge.target, current + 1);
+      dependencies.get(edge.target)?.add(edge.source);
+    });
+    
+    // 使用BFS分层
+    const processed = new Set<string>();
+    
+    while (processed.size < nodes.length) {
+      const currentLevel: string[] = [];
+      
+      // 找出所有入度为0的节点（当前层级）
+      for (const [nodeId, degree] of inDegree.entries()) {
+        if (degree === 0 && !processed.has(nodeId)) {
+          currentLevel.push(nodeId);
+        }
+      }
+      
+      if (currentLevel.length === 0) {
+        // 如果没有找到入度为0的节点，说明有循环依赖
+        break;
+      }
+      
+      levels.push(currentLevel);
+      
+      // 标记为已处理，并减少依赖节点的入度
+      currentLevel.forEach(nodeId => {
+        processed.add(nodeId);
+        inDegree.set(nodeId, -1); // 标记为已处理
+        
+        // 减少所有依赖此节点的节点的入度
+        edges.forEach(edge => {
+          if (edge.source === nodeId) {
+            const targetDegree = inDegree.get(edge.target) || 0;
+            inDegree.set(edge.target, targetDegree - 1);
+          }
+        });
+      });
+    }
+    
+    return levels;
+  }
+  
+  /**
+   * 执行工作流（支持并行执行）
    */
   async execute(workflow: Workflow): Promise<ExecutionResult> {
     const executionId = uuid();
@@ -45,8 +102,9 @@ export class WorkflowEngine {
         };
       }
       
-      // 2. 拓扑排序
-      const executionOrder = this.sorter.sort(workflow.nodes, workflow.edges);
+      // 2. 将节点分组为执行层级
+      const levels = this.groupNodesByLevel(workflow.nodes, workflow.edges);
+      const totalNodes = workflow.nodes.length;
       
       // 3. 创建执行上下文
       const context = new ExecutionContext(
@@ -59,21 +117,26 @@ export class WorkflowEngine {
       this.eventEmitter.emit('execution:started', {
         executionId,
         workflowId: workflow.id,
-        totalNodes: executionOrder.length
+        totalNodes
       });
       
-      // 5. 按顺序执行节点
-      for (let i = 0; i < executionOrder.length; i++) {
-        const nodeId = executionOrder[i];
+      // 5. 按层级并行执行节点
+      let completedNodes = 0;
+      
+      for (const level of levels) {
+        // 并行执行同一层级的所有节点
+        await Promise.all(
+          level.map(nodeId => this.executor.execute(nodeId, context))
+        );
         
-        await this.executor.execute(nodeId, context);
+        completedNodes += level.length;
         
         // 发送进度更新
         this.eventEmitter.emit('execution:progress', {
           executionId,
-          progress: ((i + 1) / executionOrder.length) * 100,
-          completedNodes: i + 1,
-          totalNodes: executionOrder.length
+          progress: (completedNodes / totalNodes) * 100,
+          completedNodes,
+          totalNodes
         });
       }
       

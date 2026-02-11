@@ -1,6 +1,7 @@
 /**
  * API配置服务
  * 负责API配置的CRUD操作和管理
+ * 使用内存缓存优化适配器和模型列表
  */
 
 import fs from 'fs/promises';
@@ -12,6 +13,7 @@ import {
   UpdateAPIConfigParams,
 } from '../models/apiConfig';
 import { createAdapterFromAPIConfig } from '../adapters/factory';
+import { createCache, MemoryCache } from '../utils/cache';
 
 /**
  * 配置服务类
@@ -19,9 +21,12 @@ import { createAdapterFromAPIConfig } from '../adapters/factory';
 export class ConfigService {
   private dataDir: string;
   private configs: Map<string, APIConfig> = new Map();
+  private modelCache: MemoryCache<string[]>;
 
   constructor() {
     this.dataDir = path.join(process.cwd(), 'server', 'data', 'configs');
+    // 模型列表缓存：最多100个，TTL 10分钟
+    this.modelCache = createCache<string[]>(100, 10 * 60 * 1000);
   }
 
   /**
@@ -125,7 +130,7 @@ export class ConfigService {
   }
 
   /**
-   * 更新配置
+   * 更新配置（清除相关缓存）
    */
   async update(id: string, params: UpdateAPIConfigParams): Promise<APIConfig> {
     const config = await this.getById(id);
@@ -153,12 +158,15 @@ export class ConfigService {
     // 保存到文件
     await this.saveConfig(config);
 
+    // 清除模型缓存
+    this.modelCache.delete(`models:${id}`);
+
     console.log(`✅ 更新API配置: ${config.name} (${config.id})`);
     return config;
   }
 
   /**
-   * 删除配置
+   * 删除配置（清除相关缓存）
    */
   async delete(id: string): Promise<boolean> {
     const config = await this.getById(id);
@@ -168,6 +176,9 @@ export class ConfigService {
 
     // 从内存中删除
     this.configs.delete(id);
+
+    // 清除模型缓存
+    this.modelCache.delete(`models:${id}`);
 
     // 删除文件
     try {
@@ -220,7 +231,7 @@ export class ConfigService {
   }
 
   /**
-   * 获取可用模型列表
+   * 获取可用模型列表（带缓存）
    */
   async getAvailableModels(id: string): Promise<string[]> {
     const config = await this.getById(id);
@@ -228,30 +239,34 @@ export class ConfigService {
       throw new Error('配置不存在');
     }
 
-    try {
-      // 如果配置中已有模型列表，直接返回
-      if (config.models && config.models.length > 0) {
-        return config.models;
-      }
-
-      // 否则从API获取
-      const adapter = createAdapterFromAPIConfig(config.toJSON());
-      const models = await adapter.getAvailableModels();
-
-      // 更新配置中的模型列表
-      if (models.length > 0) {
-        config.models = models;
-        if (!config.defaultModel && models.length > 0) {
-          config.defaultModel = models[0];
+    const cacheKey = `models:${id}`;
+    
+    return this.modelCache.getOrSet(cacheKey, async () => {
+      try {
+        // 如果配置中已有模型列表，直接返回
+        if (config.models && config.models.length > 0) {
+          return config.models;
         }
-        await this.saveConfig(config);
-      }
 
-      return models;
-    } catch (error) {
-      console.error('获取模型列表失败:', error);
-      return [];
-    }
+        // 否则从API获取
+        const adapter = createAdapterFromAPIConfig(config.toJSON());
+        const models = await adapter.getAvailableModels();
+
+        // 更新配置中的模型列表
+        if (models.length > 0) {
+          config.models = models;
+          if (!config.defaultModel && models.length > 0) {
+            config.defaultModel = models[0];
+          }
+          await this.saveConfig(config);
+        }
+
+        return models;
+      } catch (error) {
+        console.error('获取模型列表失败:', error);
+        return [];
+      }
+    });
   }
 }
 
